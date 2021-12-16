@@ -1,0 +1,364 @@
+<template>
+  <div>
+    <el-dialog title="纠正坐标" :visible.sync="dinateDialog" width="40%" :before-close="handleClose">
+      <el-form
+        :model="positionForm"
+        status-icon
+        :rules="positionRules"
+        ref="positionForm"
+        label-width="100px"
+        class="demo-ruleForm"
+        size="mini"
+      >
+        <el-row :gutter="40">
+          <el-col :span="12">
+            <div class>
+              <el-form-item label="revisedBDX" prop="revisedBDX">
+                <el-input type="text" v-model="positionForm.revisedBDX"></el-input>
+              </el-form-item>
+            </div>
+          </el-col>
+          <el-col :span="12">
+            <div class>
+              <el-form-item label="revisedBDY" prop="revisedBDY">
+                <el-input type="text" v-model="positionForm.revisedBDY"></el-input>
+              </el-form-item>
+            </div>
+          </el-col>
+        </el-row>
+        <el-form-item>
+          <el-button
+            type="success"
+            class="blueBtn"
+            size="mini"
+            @click="submitForm('positionForm')"
+          >提交</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
+    <el-dialog title="审核" :visible.sync="checkDialog" width="40%" :before-close="handleClose">
+      <!-- <lable for="checkList">请勾选</lable> -->
+      <el-checkbox-group v-model="checkList" id="checkList">
+        <el-checkbox v-for="item in totalCheckList" :key="item.id" :label="item.id"></el-checkbox>
+      </el-checkbox-group>
+      <!-- <lable for="checkAuditStatus">是否通过</lable>
+      <el-select size="mini" id="checkAuditStatus" v-model="checkAuditStatus" placeholder="请选择是否通过">
+        <el-option label="未通过" value="1"></el-option>
+        <el-option label="通过" value="2"></el-option>
+      </el-select>-->
+      <div style="margin-top:20px">
+        <el-button type="success" class="blueBtn" @click="AuditCoordinates(2)" size="mini">通过</el-button>
+        <el-button type="warning" class="blueBtn" @click="AuditCoordinates(1)" size="mini">未通过</el-button>
+      </div>
+    </el-dialog>
+    <div class="pageContent">
+      <div class="title-svg">
+        <img src="../../assets/images/Position.svg" alt />
+      </div>
+      <div class="sitesTop">
+        <div class="inputs">
+          <div class="equipSearch">
+            <el-input size="mini" v-model="search.PID" placeholder="PID"></el-input>
+          </div>
+          <div class="equipSearchBtn" style="margin-right:20px">
+            <el-button
+              type="success"
+              size="mini"
+              class="leftBtn blueBtn"
+              @click="GetSiteCoordinates()"
+            >搜索</el-button>
+          </div>
+          <div class="equipSearch">
+            <el-select size="mini" v-model="search.auditStatus" placeholder="请选择任务状态">
+              <el-option label="未通过" value="1"></el-option>
+              <el-option label="通过" value="2"></el-option>
+              <el-option label="等待审核" value="3"></el-option>
+            </el-select>
+          </div>
+        </div>
+
+        <div v-show="ischeck" class="btns">
+          <div class="equipSearch">
+            <el-button type="success" class="blueBtn" size="mini" @click="allCheck()">全部审核</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="table mainTable">
+        <el-table
+          v-loading="loading"
+          element-loading-spinner="el-icon-loading"
+          element-loading-background="rgba(256, 256, 256, 0.2)"
+          style="width: 100%;margin-top:10px;"
+          :data="tabledatas"
+        >
+          <!-- <el-table-column width="72px" prop="index" label="序列"></el-table-column> -->
+          <!-- <el-table-column prop="id" label="id"></el-table-column> -->
+          <el-table-column prop="reportUser.Name" label="提交人"></el-table-column>
+          <el-table-column prop="reviewerUser.Name" label="审核人"></el-table-column>
+          <el-table-column prop="revisedBDX" label=" 更新后经度"></el-table-column>
+          <el-table-column prop="revisedBDY" label="更新后纬度 "></el-table-column>
+          <el-table-column prop="uncorrectedBDX" label="更新前经度"></el-table-column>
+          <el-table-column prop="uncorrectedBDY" label="更新前纬度"></el-table-column>
+          <el-table-column prop="siteDevice.SName" label="站点名"></el-table-column>
+          <!-- <el-table-column prop="auditStatus" label="auditStatus"></el-table-column> -->
+          <el-table-column prop="option" label="操作">
+            <template slot-scope="scope">
+              <!-- <el-button @click="handleClick('see', scope.row)" class="option-btn-see" size="mini">历史</el-button> -->
+              <el-button
+                @click="handleClick('edit', scope.row)"
+                class="tableRedBtn"
+                size="mini"
+                plain
+              >纠正</el-button>
+              <el-button
+                v-show="ischeck"
+                @click="handleClick('check', scope.row)"
+                class="tableBlueBtn"
+                size="mini"
+                plain
+              >审核</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          :page-sizes="[10, 20, 50, 100]"
+          :page-size="pageSize"
+          :pager-count="11"
+          layout="sizes, prev, pager, next"
+          :current-page="currentPage"
+          :total="tableLen"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        ></el-pagination>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import request from "../../assets/js/axios.js";
+export default {
+  data() {
+    return {
+      search: {
+        auditStatus: "",
+        PID: ""
+      },
+      tabledatas: [],
+      tableLen: 0,
+      loading: false,
+      currentPage: 1,
+      pageSize: 10,
+      dinateDialog: false, //纠正经纬度弹窗
+      handleObj: {}, //点击的表格数据
+      positionForm: {
+        revisedBDX: "",
+        revisedBDY: ""
+      },
+      positionRules: {
+        revisedBDX: [
+          { required: true, message: "请填写百度纬度", trigger: "blur" }
+        ],
+        revisedBDY: [
+          { required: true, message: "请填写百度经度", trigger: "blur" }
+        ]
+      },
+      checkDialog: false, //审核弹窗
+      ischeck: false, //是否获取的是待审核的数据
+      checkList: [], //选中的审核列表
+      totalCheckList: [], //总的审核列表
+      checkAuditStatus: "" //审核是否通过
+    };
+  },
+  mounted() {
+    // this.GetSiteCoordinates(this.pageSize, this.currentPage);
+  },
+  methods: {
+    timePicker(timeName) {
+      for (let i = 0; i < this.CreateTime.length; i++) {
+        this.searchData[timeName + (i + 1)] = timer.dateFormat(
+          "YYYY-mm-dd HH:MM:SS",
+          this.CreateTime[i]
+        );
+      }
+    },
+    //http://127.0.0.1:999/SiteCoordinates/GetAllCoordinates
+    // GetAllCoordinates(index, page) {
+    //   let vm = this;
+    //   let form = new FormData();
+    //   form.append("index", index);
+    //   form.append("page", page);
+    //   form.append("auditStatus", vm.search.auditStatus);
+
+    //   request({
+    //     url: "/SiteCoordinates/GetAllCoordinates",
+    //     param: form,
+    //     method: "post",
+    //     onError: function() {},
+    //     vm
+    //   }).then(res => {
+    //     if (res.code == 200) {
+    //       console.log(res.data);
+    //       //   vm.tabledatas = res.data;
+    //       vm.tabledatas = [{}]; //todo for test
+    //       vm.tableLen = res.data.length;
+    //     }
+    //   });
+    // },
+    GetSiteCoordinates(index, page) {
+      let vm = this;
+      let url;
+      var resultData = {};
+      if (vm.search.PID) {
+        let data = {
+          PID: vm.search.PID,
+          auditStatus: parseInt(vm.search.auditStatus)
+        };
+        url = `/SiteCoordinates/GetSiteCoordinatesByPID?index=${index}&page=${page}`;
+        resultData = JSON.stringify(data);
+      } else {
+        resultData = new FormData();
+        resultData.append("index", index || vm.pageSize);
+        resultData.append("page", page || vm.currentPage);
+        resultData.append("auditStatus", vm.search.auditStatus); //http://127.0.0.1:999/SiteCoordinates/GetAllCoordinates
+        url = "/SiteCoordinates/GetAllCoordinates";
+      }
+      console.log("resultData", resultData);
+      request({
+        url: url,
+        param: resultData,
+        method: "post",
+        onError: function(res) {
+          console.log("false没执行", res);
+        },
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          console.log(res.data);
+          vm.tabledatas = res.data;
+          //   vm.tabledatas = [{}]; //todo for test
+          vm.tableLen = res.recordsFiltered;
+
+          if (
+            url == "/SiteCoordinates/GetAllCoordinates" &&
+            vm.search.auditStatus == 3
+          ) {
+            vm.ischeck = true;
+          } else {
+            vm.ischeck = false;
+          }
+        }
+      });
+    },
+    AuditCoordinates(state) {
+      let vm = this;
+      let arr = [];
+      //   if (obj) {
+      //     arr.push(obj.siteDevice.PID);
+      //   } else {
+      //     arr = vm.tabledatas.map(function(item) {
+      //       return item.siteDevice.PID;
+      //     });
+      //   }
+      let data = {
+        ids: vm.checkList,
+        AuditStatus: state
+      };
+      //console.log("checkList", data);
+      //return;
+      request({
+        url: "/SiteCoordinates/AuditCoordinates",
+        method: "post",
+        param: JSON.stringify(data),
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.handleClose();
+          vm.GetSiteCoordinates(vm.pageSize, vm.currentPage);
+          vm.$message({
+            message: "审核成功",
+            type: "success",
+            duration: 1000
+          });
+        }
+      });
+    },
+    allCheck() {
+      this.checkDialog = true;
+      this.totalCheckList = this.tabledatas;
+      this.checkList = [];
+    },
+    submitForm(formName) {
+      let vm = this;
+      this.$refs[formName].validate(valid => {
+        if (valid) {
+          //   alert("submit!");
+
+          let data = {
+            PID: vm.handleObj.siteDevice.PID,
+            revisedBDX: parseFloat(vm.positionForm.revisedBDX),
+            revisedBDY: parseFloat(vm.positionForm.revisedBDY)
+          };
+          //   console.log(" vm.handleObj.PID", vm.handleObj.siteDevice.PID);
+          request({
+            url: "/SiteCoordinates/ReportSiteCoordinate", ///SiteCoordinates/ReportSiteCoordinate
+            method: "post",
+            param: JSON.stringify(data),
+            onError: function() {},
+            vm
+          }).then(res => {
+            if (res.code == 200) {
+              vm.dinateDialog = false;
+              vm.$message({
+                message: "修改成功",
+                type: "success",
+                duration: 1000
+              });
+            }
+          });
+        } else {
+          console.log("error submit!!");
+          return false;
+        }
+      });
+    },
+    handleClick(text, obj) {
+      let vm = this;
+      switch (text) {
+        case "see": //查看历史坐标
+          break;
+        case "edit": //编辑纠正坐标
+          vm.dinateDialog = true;
+          vm.handleObj = obj;
+          console.log("handleObj", obj);
+          //http://127.0.0.1:999/SiteCoordinates/ReportSiteCoordinate
+          break;
+        case "check":
+          //   vm.AuditCoordinates(obj);
+          vm.checkDialog = true;
+          vm.checkList = [];
+          vm.totalCheckList = [];
+          vm.totalCheckList.push(obj);
+          //   console.log(obj);
+          vm.checkList.push(obj.id);
+          break;
+      }
+    },
+    handleSizeChange(val) {
+      this.currentPage = 1;
+      this.pageSize = val;
+      this.GetSiteCoordinates(this.pageSize, this.currentPage);
+    },
+    handleCurrentChange(val) {
+      this.currentPage = val;
+      this.GetSiteCoordinates(this.pageSize, this.currentPage);
+    },
+    handleClose() {
+      this.dinateDialog = false;
+      this.checkDialog = false;
+    }
+  }
+};
+</script>
+<style lang="scss">
+</style>

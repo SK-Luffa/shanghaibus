@@ -1,0 +1,839 @@
+<template>
+  <div>
+    <el-dialog
+      title="创建任务"
+      :visible.sync="addTasksDialog"
+      width="960px"
+      :before-close="handleClose"
+    >
+      <!-- <el-row :gutter="40">
+        <el-col :span="4">选择设备：</el-col>
+        <el-col :span="20">
+          <div class="pidSelectBox">
+            <div>
+              <el-checkbox
+                :indeterminate="isIndeterminate"
+                v-model="checkAll"
+                @change="handleCheckAllChange"
+              >当前页全选</el-checkbox>
+              <div class="clearfix"></div>
+            </div>
+
+            <el-checkbox-group
+              v-model="addTasksData.siteDeviceList"
+              @change="handleCheckedCitiesChange"
+            >
+              <el-checkbox v-for="item in tabledatas" :key="item.PID" :label="item.PID"></el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>-->
+      <el-row :gutter="40" style="margin-top:10px">
+        <el-col :span="4">执行人：</el-col>
+        <el-col :span="20">
+          <el-select size="mini" v-model="addTasksData.executorUserId" placeholder="请选择">
+            <el-option
+              v-for="item in mobileUser"
+              :key="item.name"
+              :label="item.Name+item.phone"
+              :value="item.userId"
+            ></el-option>
+          </el-select>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top:10px">
+        <el-col :span="4">任务类型：</el-col>
+        <el-col :span="20">
+          <el-select size="mini" v-model="addTasksData.TaskTypeCode" placeholder="请选择">
+            <el-option
+              v-for="item in allTaskType"
+              :key="item.name"
+              :label="item.name"
+              :value="item.code"
+            ></el-option>
+          </el-select>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top:10px">
+        <el-col :span="4">时间选择：</el-col>
+        <el-col :span="20">
+          <el-date-picker
+            v-model="selectTime"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            @change="timePicker()"
+            size="mini"
+          ></el-date-picker>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top:10px">
+        <el-col :span="4">备注：</el-col>
+        <el-col :span="20">
+          <el-input type="text" size="mini" placeholder="请输入内容" v-model="addTasksData.remarks"></el-input>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <div style="margin-top:10px">
+        <el-button type="success" class="blueBtn" size="mini" @click="BatchCreateTask()">创建任务</el-button>
+      </div>
+    </el-dialog>
+    <div class="pageContent">
+      <div class="sitesTop">
+        <div class="inputs">
+          <div class="equipSearch">
+            <el-select v-model="searchType" @change="typeSel()" placeholder="请选择查询方式" size="mini">
+              <el-option label="离线设备" value="offLine"></el-option>
+              <el-option label="主电池电压范围" value="MbV"></el-option>
+              <el-option label="副电池电压范围" value="AbV"></el-option>
+              <el-option label="电量百分比范围" value="DumpE"></el-option>
+              <el-option label="充电电压范围" value="SunPadV"></el-option>
+              <el-option label="充电电流范围" value="CDdl"></el-option>
+              <el-option label="PID" value="pid"></el-option>
+            </el-select>
+          </div>
+          <div class="equipSearch searchTypeDataBox" :style="{width:boxWidth}">
+            <div v-if="searchType!='pid'">
+              <div class="col-text">
+                <span>范围:</span>
+              </div>
+              <div class="col-input">
+                <el-input size="mini" v-model="data1"></el-input>
+              </div>
+              <div class="col-text">
+                <span>至</span>
+              </div>
+              <div class="col-input">
+                <el-input size="mini" v-model="data2"></el-input>
+              </div>
+            </div>
+            <div v-else>
+              <el-input size="mini" v-model="PID"></el-input>
+            </div>
+          </div>
+          <div class="equipSearchBtn">
+            <el-button
+              type="success"
+              size="mini"
+              class="leftBtn blueBtn"
+              @click="GetSiteDeviceFor()"
+            >搜索</el-button>
+          </div>
+        </div>
+
+        <!-- <div class="clearfix"></div> -->
+      </div>
+
+      <div class="left">
+        <div class="baidumap">
+          <baidu-map
+            class="bm-view"
+            :center="center"
+            :zoom="zoom"
+            @ready="handler"
+            :scroll-wheel-zoom="true"
+          >
+            <bml-marker-clusterer :averageCenter="true">
+              <!-- <div v-for="item in onlineSiteDevice" :key="item.PID">
+              <bm-marker
+                :position="{lng:item.BDX, lat: item.BDY }"
+                :icon="{url:posImg.pos1,size: {width: 28, height: 28}}"
+                :dragging="false"
+              ></bm-marker>
+              </div>-->
+              <div v-for="item in offlineSiteDevice" :key="item.PID">
+                <bm-marker
+                  :position="{lng:item.BDX, lat: item.BDY }"
+                  :dragging="false"
+                  @click="infoWindowOpen(item)"
+                ></bm-marker>
+              </div>
+
+              <bm-info-window
+                :position="{lng: clickPosObj.BDX, lat: clickPosObj.BDY }"
+                :title="(clickPosObj.SName +'          '+   clickPosObj.Online ) "
+                :show="bmInfoWindowShow"
+                @close="infoWindowClose"
+                style="width:600px"
+              >
+                <!-- <p>地址：{{clickPosObj.Addr}}</p>
+                <p>纬度：{{clickPosObj.BDY}}°N</p>
+                <P>经度：{{clickPosObj.BDX}}°E</P>-->
+                <!-- <button>Clear</button> -->
+                <div class="mapDetail">
+                  <el-tabs v-model="siteDetailActiveName">
+                    <el-tab-pane label="常规" name="normal">
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>站点名称：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.SName}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>站点地址：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Addr}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>站点编码：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.SCode}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>站点PID：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.PID}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>站点类型：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Ptype}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>屏幕类型：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Stype}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>方向：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.FxDirection}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>线路：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Lines}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                    </el-tab-pane>
+                    <el-tab-pane label="电池" name="power">
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>电池电量：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.DumpE}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>充电电流：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.CDdl}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>主电池电压：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.MbV}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>副电池电压：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.AbV}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                    </el-tab-pane>
+                    <el-tab-pane label="坐标" name="position">
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>百度经度：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.BDX}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>百度纬度：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.BDY}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>经度：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.X}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>纬度：</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Y}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                    </el-tab-pane>
+                    <!-- <el-tab-pane label="图片" name="image">
+                      <img v-if="clickPosObj.StatusPicUrl" :src="clickPosObj.StatusPicUrl" alt />
+                      <div v-else>暂无图片信息</div>
+                    </el-tab-pane>-->
+                    <el-tab-pane label="供应商" name="supplier">
+                      <el-row :gutter="10">
+                        <el-col :span="12">
+                          <div class>
+                            <el-row :gutter="10">
+                              <el-col :span="8">
+                                <div class>供应商:</div>
+                              </el-col>
+                              <el-col :span="16">
+                                <div class>{{clickPosObj.Supplier}}</div>
+                              </el-col>
+                            </el-row>
+                          </div>
+                        </el-col>
+                      </el-row>
+                    </el-tab-pane>
+                  </el-tabs>
+                  <div class="sendTask">
+                    <el-button type="success" class="blueBtn" size="mini" @click="creatTask">创建任务</el-button>
+                  </div>
+                </div>
+              </bm-info-window>
+            </bml-marker-clusterer>
+          </baidu-map>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import pos1 from "../../assets/img/icon/pos1.png";
+import pos2 from "../../assets/img/icon/pos2.png";
+import mapsjs from "../js/maps";
+import request from "../../assets/js/axios";
+import timer from "../../assets/js/time.js";
+import { BmlMarkerClusterer } from "vue-baidu-map";
+export default {
+  data() {
+    return {
+      center: { lng: 121.445, lat: 31.213 },
+      zoom: 11,
+      onlineSiteDevice: [],
+      offlineSiteDevice: [],
+      searchType: "offLine",
+      data1: "",
+      data2: "",
+      boxWidth: "0px",
+      clickPosObj: {},
+      bmInfoWindowShow: false,
+      siteDetailActiveName: "normal",
+      PID: "",
+      addTasksDialog: false,
+      isIndeterminate: false,
+      checkAll: false,
+      addTasksData: {
+        executorUserId: "",
+        siteDeviceList: [],
+        taskTypeCode: 500,
+        setStartTime: "",
+        setEndTime: "",
+        remarks: ""
+      },
+      mobileUser: [],
+      allTaskType: [],
+      selectTime: ""
+    };
+  },
+  //   components: { Echartsbox },
+  created() {},
+  components: {
+    BmlMarkerClusterer
+  },
+  mounted() {
+    // this.online();
+    this.GetSiteDeviceFor();
+    let vm = this;
+    request({
+      url: "/User/GetAllUser",
+      method: "post",
+      onError: function() {},
+      vm
+    }).then(res => {
+      if (res.code == 200) {
+        vm.mobileUser = res.data.filter(function(item) {
+          //   return item.isMobile;
+          return item;
+        });
+        // console.log(vm.mobileUsezr);
+      }
+    });
+    request({
+      url: "/TaskStatus/GetAllTaskStatus",
+      method: "post",
+      onError: function() {},
+      vm
+    }).then(res => {
+      if (res.code == 200) {
+        // console.log(res.data);
+        vm.allTaskStatus = res.data;
+      }
+    });
+    request({
+      url: "/TaskType/GetAllTaskType",
+      method: "post",
+      onError: function() {},
+      vm
+    }).then(res => {
+      if (res.code == 200) {
+        // console.log(res.data);
+        vm.allTaskType = res.data;
+      }
+    });
+  },
+
+  methods: {
+    timePicker() {
+      this.addTasksData.setStartTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[0]
+      );
+      this.addTasksData.setEndTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[1]
+      );
+    },
+    infoWindowOpen(item) {
+      console.log(item);
+      console.log("clickPosObj", item);
+      this.clickPosObj = item;
+      this.bmInfoWindowShow = true;
+    },
+    infoWindowClose() {
+      this.bmInfoWindowShow = false;
+    },
+    GetSiteDeviceFor() {
+      switch (this.searchType) {
+        case "offLine":
+          this.offline();
+          break;
+        case "pid":
+          this.GetSiteDeviceByDeviceId();
+          break;
+        default:
+          this.GetSitebyOther();
+      }
+    },
+    GetSiteDeviceByDeviceId() {
+      //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceByDeviceId
+      let vm = this;
+      vm.lastOperate = "byId";
+      let data = new FormData();
+      data.append("PID", vm.PID * 1);
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceByDeviceId",
+        param: data,
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          //   vm.tabledatas = [];
+          //   vm.tabledatas.push(res.data);
+          //   vm.tableLen = 1;
+          vm.offlineSiteDevice = [];
+          vm.offlineSiteDevice.push(res.data);
+          console.log("res.data", res.data);
+          vm.$message({
+            message: "查询到" + 1 + "条数据！",
+            type: "success"
+          });
+        }
+      });
+    },
+    // handleCheckedCitiesChange(value) {
+    //   let checkedCount = value.length;
+    //   this.checkAll = checkedCount === this.tabledatas.length;
+    //   this.isIndeterminate =
+    //     checkedCount > 0 && checkedCount < this.tabledatas.length;
+    // },
+    typeSel() {
+      if (this.searchType == "offLine") {
+        this.boxWidth = "0px";
+        this.data1 = this.data2 = "";
+      } else {
+        if (this.searchType == "pid") {
+          this.boxWidth = "160px";
+          this.data1 = this.data2 = "";
+        } else {
+          this.boxWidth = "320px";
+        }
+      }
+    },
+    GetSitebyOther() {
+      let vm = this;
+      let form = new FormData();
+      form.append("index", 10000);
+      form.append("page", 1);
+      form.append(vm.searchType + "1", parseInt(vm.data1));
+      form.append(vm.searchType + "2", parseInt(vm.data2));
+      var url = "";
+      switch (vm.searchType) {
+        case "MbV": //查询主电池电压范围内的站点数据
+          url = "/SiteDeviceControllers/GetSiteDeviceForMbV";
+          break;
+        case "AbV": //查询副电池电压范围内的站点数据
+          url = "/SiteDeviceControllers/GetSiteDeviceForAbV"; //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForAbV
+          break;
+        case "DumpE": //查询电量百分比范围内的站点数据
+          url = "/SiteDeviceControllers/GetSiteDeviceForDumpE"; //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForDumpE
+          break;
+        case "SunPadV": //查询充电电压范围内的站点数据
+          url = "/SiteDeviceControllers/GetSiteDeviceForSunPadV"; //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForSunPadV
+          break;
+        case "CDdl": //查询充电电流范围内的站点数据
+          url = "/SiteDeviceControllers/GetSiteDeviceForCDdl"; //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForCDdl
+          break;
+      }
+      request({
+        url: url,
+        method: "post",
+        param: form,
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          console.log(res.data);
+          vm.offlineSiteDevice = res.data;
+          console.log("res.data", res.data);
+          vm.$message({
+            message: "查询到" + res.data.length + "条数据！",
+            type: "success"
+          });
+        }
+      });
+    },
+    updateMaker() {},
+    BatchCreateTask() {
+      let vm = this;
+      this.addTasksData.setStartTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[0]
+      );
+      this.addTasksData.setEndTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[1]
+      );
+      let data = vm.addTasksData;
+      //data.executorUserId = "0a6bcc63b426c73d8f7284f272475705"; //todo test for mobile
+      request({
+        url: "/Task/BatchCreateTask",
+        method: "post",
+        param: JSON.stringify(data),
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.addTasksDialog = false;
+          //   vm.siteDeviceList = [];
+          vm.$message({
+            type: "success",
+            message: "任务创建成功！",
+            duration: 1000
+          });
+        }
+      });
+    },
+    creatTask() {
+      this.addTasksData.siteDeviceList.push(this.clickPosObj.PID);
+      this.addTasksDialog = true;
+    },
+    online() {
+      let vm = this;
+      var timer = new Date().getTime();
+      for (let i = 0; i < 3000; i++) {
+        vm.onlineSiteDevice.push({
+          PID: "pid" + timer + i,
+          BDX: "121.487389",
+          BDY: "31.402117"
+        });
+      }
+      console.log(new Date().getTime() - timer);
+      return;
+      let formData = new FormData();
+      formData.append("index", 10000);
+      formData.append("page", 1);
+      formData.append("isOnline", true);
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceForIsOnline", //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForIsOnline
+        param: formData,
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.onlineSiteDevice = res.data;
+          console.log("res.data", res.data);
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    offline() {
+      let vm = this;
+      let formData = new FormData();
+      formData.append("index", 10000);
+      formData.append("page", 1);
+      formData.append("isOnline", false);
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceForIsOnline", //http://127.0.0.1:999/SiteDeviceControllers/GetSiteDeviceForIsOnline
+        param: formData,
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.offlineSiteDevice = res.data;
+          console.log("res.data", res.data);
+          vm.$message({
+            message: "查询到" + res.data.length + "条数据！",
+            type: "success"
+          });
+          //   vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    handleClose() {
+      this.addTasksDialog = false;
+    },
+    handler({ BMap, map }) {},
+    handleCheckAllChange(val) {
+      //   this.addTasksData.siteDeviceList = val ? cityOptions : [];
+      if ((this.addTasksData.siteDeviceList = val)) {
+        this.addTasksData.siteDeviceList = this.tabledatas.map(function(item) {
+          return item.PID;
+        });
+      } else {
+        this.addTasksData.siteDeviceList = [];
+      }
+      this.isIndeterminate = false;
+    }
+  }
+};
+</script>
+
+<style lang='scss'>
+/* .left {
+  float: left;
+  width: 74%;
+} */
+/* .databox {
+  width: 80%;
+  margin: 0 auto;
+} */
+
+.maphead {
+  border: 2px solid green;
+  padding: 10px;
+}
+.mapitem,
+.mapsum {
+  display: flex;
+  justify-content: space-around;
+}
+.maphead span {
+  display: inline;
+  /* width: 100px; */
+  text-align: center;
+  line-height: 26px;
+  font-size: 14px;
+}
+.mapitem span {
+  color: #04cb8e;
+}
+.mapsum span {
+  color: #fff;
+}
+.mt-io-title {
+  border-left: 4px solid #07c054;
+  font-size: 20px;
+  padding-left: 10px;
+  line-height: 20px;
+  margin-bottom: 5px;
+  margin-top: 25px;
+  color: #fff;
+  text-align: left;
+}
+.bm-view {
+  width: 100%;
+  height: 760px;
+  margin-top: 13px;
+}
+.mapsel,
+.equtype {
+  position: absolute;
+  z-index: 10;
+  background: rgba(256, 256, 256, 0.8);
+}
+.baidumap {
+  position: relative;
+}
+.equtype {
+  bottom: 5px;
+  left: 5px;
+}
+.equtype span {
+  display: block;
+  /* float: left; */
+  width: 60px;
+  text-align: center;
+  color: #333;
+  line-height: 32px;
+  cursor: pointer;
+  /* font-weight: bold; */
+}
+.mapsel span {
+  cursor: pointer;
+  display: block;
+  float: left;
+  width: 120px;
+  text-align: center;
+  color: #333;
+  line-height: 36px;
+  font-size: 16px;
+  font-weight: bold;
+}
+.searchTypeDataBox {
+  float: left;
+  padding-left: 10px;
+  height: 28px;
+  overflow: hidden;
+  transition: all 1s;
+  div {
+    float: left;
+  }
+  .col-text {
+    width: 34px;
+    font-size: 14px;
+    text-align: center;
+    color: #fff;
+    line-height: 28px;
+    margin-right: 4px;
+  }
+  .col-input {
+    width: 120px;
+  }
+}
+.sendTask {
+  display: flex;
+  margin-top: 20px;
+  justify-content: center;
+}
+</style>

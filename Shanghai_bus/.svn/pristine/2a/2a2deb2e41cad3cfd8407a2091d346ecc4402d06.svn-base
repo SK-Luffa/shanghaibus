@@ -1,0 +1,690 @@
+<template>
+  <div>
+    <el-dialog
+      title="多ID搜索"
+      :visible.sync="searchIdlistDialog"
+      width="960px"
+      :before-close="handleClose"
+      ><div style="width: 80%; margin: 0 auto">
+        <el-input
+          type="textarea"
+          :rows="4"
+          placeholder="请输入内容"
+          v-model="siteList"
+        >
+        </el-input>
+        <el-button
+          style="margin-top: 30px"
+          type="success"
+          size="mini"
+          class="leftBtn blueBtn"
+          @click="getSiteDeviceForPIDList()"
+          >查找</el-button
+        >
+      </div></el-dialog
+    >
+    <!-- getTaskByPIDDialog -->
+    <el-dialog
+      title="查询任务"
+      :visible.sync="getTaskByPIDDialog"
+      width="960px"
+      :before-close="handleClose"
+    >
+      <el-form
+        :inline="true"
+        :model="getTaskByPIDData"
+        class="demo-form-inline"
+      >
+        <el-row :gutter="20">
+          <el-col :span="10">
+            <el-form-item label="任务类型">
+              <el-select
+                v-model="getTaskByPIDData.taskTypeCode"
+                placeholder="请选择"
+                id="taskTypeCode"
+                size="mini"
+              >
+                <el-option
+                  v-for="item in allTaskType"
+                  :key="item.name"
+                  :label="item.name"
+                  :value="item.code"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="10">
+            <el-form-item label="任务状态">
+              <el-select
+                v-model="getTaskByPIDData.taskStatusCode"
+                placeholder="请选择"
+                id="taskTypeCode"
+                size="mini"
+              >
+                <el-option
+                  v-for="item in allTaskStatus"
+                  :key="item.name"
+                  :label="item.name"
+                  :value="item.code"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="4">
+            <el-form-item>
+              <el-button
+                size="mini"
+                class="blueBtn"
+                type="success"
+                @click="GetTaskForSiteDevicePID"
+                >查询</el-button
+              >
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <el-table
+        v-loading="loading"
+        element-loading-spinner="el-icon-loading"
+        element-loading-background="rgba(256, 256, 256, 0.2)"
+        style="width: 100%; margin-top: 10px"
+        :data="PIDTasks"
+      >
+        <el-table-column width="72px" prop="id" label="id"></el-table-column>
+        <el-table-column prop="createTime" label="创建时间"></el-table-column>
+        <el-table-column
+          prop="executorUser.Name"
+          label="执行人"
+        ></el-table-column>
+        <el-table-column
+          prop="createUser.Name"
+          label="创建人"
+        ></el-table-column>
+        <el-table-column
+          prop="siteDevice.SName"
+          label="站点名称"
+        ></el-table-column>
+        <el-table-column
+          prop="taskType.name"
+          label="任务类型"
+        ></el-table-column>
+      </el-table>
+    </el-dialog>
+    <el-dialog
+      title="上报故障点"
+      :visible.sync="failureSiteDialog"
+      width="960px"
+      :before-close="handleClose"
+    ></el-dialog>
+    <el-dialog
+      title="创建任务"
+      :visible.sync="addTasksDialog"
+      width="960px"
+      :before-close="handleClose"
+    >
+      <el-row :gutter="40">
+        <el-col :span="4">选择设备：</el-col>
+        <el-col :span="20">
+          <div class="pidSelectBox">
+            <div>
+              <el-checkbox
+                :indeterminate="isIndeterminate"
+                v-model="checkAll"
+                @change="handleCheckAllChange"
+                >当前页全选</el-checkbox
+              >
+              <div class="clearfix"></div>
+            </div>
+
+            <el-checkbox-group
+              v-model="addTasksData.siteDeviceList"
+              @change="handleCheckedCitiesChange"
+            >
+              <el-checkbox
+                v-for="item in tabledatas"
+                :key="item.PID"
+                :label="item.PID"
+              ></el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top: 10px">
+        <el-col :span="4">执行人：</el-col>
+        <el-col :span="20">
+          <el-select
+            size="mini"
+            v-model="addTasksData.executorUserId"
+            placeholder="请选择"
+          >
+            <el-option
+              v-for="item in mobileUser"
+              :key="item.name"
+              :label="item.Name + item.phone"
+              :value="item.userId"
+            ></el-option>
+          </el-select>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top: 10px">
+        <el-col :span="4">任务类型：</el-col>
+        <el-col :span="20">
+          <el-select
+            size="mini"
+            v-model="addTasksData.TaskTypeCode"
+            placeholder="请选择"
+          >
+            <el-option
+              v-for="item in allTaskType"
+              :key="item.name"
+              :label="item.name"
+              :value="item.code"
+            ></el-option>
+          </el-select>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top: 10px">
+        <el-col :span="4">时间选择：</el-col>
+        <el-col :span="20">
+          <el-date-picker
+            v-model="selectTime"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            @change="timePicker()"
+            size="mini"
+          ></el-date-picker>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <el-row :gutter="40" style="margin-top: 10px">
+        <el-col :span="4">备注：</el-col>
+        <el-col :span="20">
+          <el-input
+            type="text"
+            size="mini"
+            placeholder="请输入内容"
+            v-model="addTasksData.remarks"
+          ></el-input>
+        </el-col>
+        <div class="clearfix"></div>
+      </el-row>
+      <div style="margin-top: 10px">
+        <el-button
+          type="success"
+          class="blueBtn"
+          size="mini"
+          @click="BatchCreateTask()"
+          >创建任务</el-button
+        >
+      </div>
+    </el-dialog>
+    <div class="pageContent">
+      <div class="title-svg">
+        <img src="../../assets/images/CreatTasks.svg" alt />
+      </div>
+      <div class="sitesTop">
+        <div class="inputs">
+          <div class="equipSearch">
+            <el-input
+              size="mini"
+              v-model="search.getvalue"
+              placeholder="站点/地址/id"
+            ></el-input>
+          </div>
+          <div class="equipSearchBtn">
+            <!-- <el-button type="success" size="mini" class="leftBtn" @click="GetSiteDeviceByDeviceId()">搜索</el-button> -->
+            <el-button
+              type="success"
+              size="mini"
+              class="leftBtn blueBtn"
+              @click="getSiteDeviceForContains()"
+              >查询</el-button
+            >
+          </div>
+          <div class="equipSearchBtn">
+            <el-button
+              type="success"
+              size="mini"
+              class="leftBtn blueBtn"
+              @click="showSearchDialog()"
+              >多ID搜索</el-button
+            >
+          </div>
+        </div>
+        <div class="btns">
+          <div class>
+            <el-button
+              class="blueBtn"
+              type="success"
+              icon="el-icon-plus"
+              size="mini"
+              @click="addTasks()"
+              >创建任务</el-button
+            >
+          </div>
+        </div>
+
+        <!-- <div class="clearfix"></div> -->
+      </div>
+
+      <div class="table mainTable">
+        <el-table
+          v-loading="loading"
+          element-loading-spinner="el-icon-loading"
+          element-loading-background="rgba(256, 256, 256, 0.2)"
+          style="width: 100%; margin-top: 10px"
+          :data="tabledatas"
+        >
+          <el-table-column
+            width="72px"
+            prop="index"
+            label="序列"
+          ></el-table-column>
+          <el-table-column prop="PID" label="站点id"></el-table-column>
+          <el-table-column prop="SName" label="站点名称"></el-table-column>
+          <!-- <el-table-column prop="Addr" label="站点地址"></el-table-column> -->
+          <el-table-column prop="FxDirection" label="方向"></el-table-column>
+          <el-table-column prop="Stype" label="设备类型"></el-table-column>
+          <el-table-column prop="Ptype" label="站点类型"></el-table-column>
+          <!-- <el-table-column prop="StDate" label="距上次刷新间隔"></el-table-column> -->
+          <el-table-column prop="SunPadV" label="主电池电压"></el-table-column>
+          <el-table-column prop="SunPadV" label="副电池电压"></el-table-column>
+          <el-table-column prop="CDdl" label="充电电流"></el-table-column>
+          <el-table-column prop="Online" label="在线情况"></el-table-column>
+          <el-table-column prop="option" label="操作">
+            <template slot-scope="scope">
+              <!-- <el-button
+              @click="handleClick('updata', scope.row)"
+              class="option-btn-see"
+              type="success"
+              size="mini"
+              >故障上报</el-button>-->
+              <el-button
+                @click="handleClick('see', scope.row)"
+                class="tableBlueBtn"
+                size="mini"
+                plain
+                >查询任务</el-button
+              >
+              <!-- <el-button
+              @click="handleClick('delete', scope.row)"
+              class="option-btn-delet"
+              size="mini"
+              plain
+              >删除</el-button>-->
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-pagination
+          :page-sizes="[10, 20, 50, 100, 1000]"
+          :page-size="pageSize"
+          layout="sizes, prev, pager, next"
+          :pager-count="11"
+          :current-page="currentPage"
+          :total="tableLen"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        ></el-pagination>
+      </div>
+      <!-- <div></div>
+    <div>
+      <input type="text " v-model="search.getvalue" />
+      <el-button @click="getSiteDeviceForContains"></el-button>
+      </div>-->
+    </div>
+  </div>
+</template>
+<script>
+import request from "../../assets/js/axios.js";
+import timer from "../../assets/js/time.js";
+export default {
+  data() {
+    const user = JSON.parse(localStorage.getItem("user"));
+    return {
+      searchIdlistDialog: false,
+      siteList:"",
+      search: {
+        getvalue: "",
+      },
+      tabledatas: [],
+      tableLen: 0,
+      pageSize: 10,
+      loading: false,
+      currentPage: 1,
+      lastOperate: "",
+      addTasksDialog: false,
+      siteArr: [],
+      //   siteDeviceList: [],
+      allTaskType: [],
+      addTasksData: {
+        executorUserId: "",
+        siteDeviceList: [],
+        taskTypeCode: 500,
+        setStartTime: "",
+        setEndTime: "",
+        remarks: "",
+      },
+      selectTime: "",
+      checkAll: false,
+      isIndeterminate: false,
+      //http://127.0.0.1:999/FailureSite/CreateFailureSite
+      failureSiteDialog: false,
+      getTaskByPIDDialog: false,
+      getTaskByPIDData: {
+        PID: "1908202011301",
+        taskTypeCode: 500,
+        taskStatusCode: 100,
+      },
+      allTaskType: [],
+      allTaskStatus: [],
+      PIDTasks: [],
+      mobileUser: [],
+    };
+  },
+  mounted() {
+    this.GetAllSiteDevice();
+    let vm = this;
+    request({
+      url: "/User/GetAllUser",
+      method: "post",
+      onError: function () {},
+      vm,
+    }).then((res) => {
+      if (res.code == 200) {
+        vm.mobileUser = res.data.filter(function (item) {
+          return item.isMobile;
+          //   return item;
+        });
+        // console.log(vm.mobileUsezr);
+      }
+    });
+    request({
+      url: "/TaskStatus/GetAllTaskStatus",
+      method: "post",
+      onError: function () {},
+      vm,
+    }).then((res) => {
+      if (res.code == 200) {
+        // console.log(res.data);
+        vm.allTaskStatus = res.data;
+      }
+    });
+    request({
+      url: "/TaskType/GetAllTaskType",
+      method: "post",
+      onError: function () {},
+      vm,
+    }).then((res) => {
+      if (res.code == 200) {
+        // console.log(res.data);
+        vm.allTaskType = res.data;
+      }
+    });
+  },
+  methods: {
+    showSearchDialog() {
+      this.searchIdlistDialog = true;
+    },
+    getSiteDeviceForPIDList() {
+      let reg = /[\s\n]/;
+      let PIDList = this.siteList.split(reg).filter((item) => item != "");
+      let vm = this;
+      vm.currentPage = 1;
+      vm.pageSize = 1000;
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceForPIDList",
+        method: "post",
+        param: JSON.stringify({ PIDList }),
+        onError() {},
+        vm,
+      }).then((res) => {
+        if (res.code == 200) {
+          vm.tabledatas = vm.addIndex(res.data);
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    GetAllSiteDevice() {
+      let vm = this;
+      vm.lastOperate = "all";
+      let formData = new FormData();
+      formData.append("index", vm.pageSize);
+      formData.append("page", vm.currentPage);
+      request({
+        url: "/SiteDeviceControllers/GetAllSiteDevice", //http://127.0.0.1:999/SiteDeviceControllers/GetAllSiteDevice
+        param: formData,
+        method: "post",
+        onError: function () {},
+        vm,
+      }).then((res) => {
+        if (res.code == 200) {
+          vm.tabledatas = vm.addIndex(res.data);
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+
+    timePicker() {
+      this.addTasksData.setStartTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[0]
+      );
+      this.addTasksData.setEndTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[1]
+      );
+    },
+    handleCurrentChange(val) {
+      this.currentPage = val;
+      this.upData();
+    },
+    handleSizeChange(val) {
+      this.pageSize = val;
+      if (val > this.tableLen) {
+        this.currentPage = 1;
+      }
+      this.upData();
+    },
+    upData() {
+      console.log(this.lastOperate);
+      switch (this.lastOperate) {
+        case "all":
+          this.GetAllSiteDevice();
+          break;
+        case "info":
+          //isOnline  byId  info
+          this.getSiteDeviceForContains();
+          break;
+      }
+    },
+
+    addTasks() {
+      this.addTasksDialog = true;
+    },
+    handleClose() {
+      this.addTasksDialog = false;
+      this.failureSiteDialog = false;
+      this.getTaskByPIDDialog = false;
+       this.searchIdlistDialog = false;
+      this.addTasksData = {
+        executorUserId: "",
+        siteDeviceList: [],
+        taskTypeCode: 500,
+        setStartTime: "",
+        setEndTime: "",
+        remarks: "",
+      };
+      this.checkAll = false;
+    },
+
+    addIndex(arr) {
+      arr.map((Element, index) => {
+        Element.index = index + 1 + (this.currentPage - 1) * this.pageSize;
+        return Element;
+      });
+      return arr;
+    },
+    BatchCreateTask() {
+      let vm = this;
+      this.addTasksData.setStartTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[0]
+      );
+      this.addTasksData.setEndTime = timer.dateFormat(
+        "YYYY-mm-dd HH:MM:SS",
+        this.selectTime[1]
+      );
+      let data = vm.addTasksData;
+      //data.executorUserId = "0a6bcc63b426c73d8f7284f272475705"; //todo test for mobile
+      request({
+        url: "/Task/BatchCreateTask",
+        method: "post",
+        param: JSON.stringify(data),
+        onError: function () {},
+        vm,
+      }).then((res) => {
+        if (res.code == 200) {
+          vm.addTasksDialog = false;
+          vm.siteDeviceList = [];
+          vm.$message({
+            type: "success",
+            message: "任务创建成功！",
+            duration: 1000,
+          });
+        }
+      });
+    },
+    getSiteDeviceForContains() {
+      let vm = this;
+      if (!vm.search.getvalue) {
+        vm.GetAllSiteDevice(currentPage);
+        return;
+      }
+      let data = new FormData();
+      vm.lastOperate = "info";
+      data.append("info", vm.search.getvalue);
+      data.append("index", vm.pageSize);
+      data.append("page", vm.currentPage);
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceForContains",
+        param: data,
+        method: "post",
+        onError: function () {},
+        vm,
+      }).then((res) => {
+        if (res.code == 200) {
+          vm.tabledatas = vm.addIndex(res.data);
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    GetSiteDeviceForRemark() {
+      let vm = this;
+      let data = new formData();
+      data.append("info", vm.search.num);
+      data.append("page", 1);
+      data.append("index", 10);
+      request({
+        url: "/SiteDeviceControllers/GetSiteDeviceForRemark",
+      }).then((res) => {
+        if (res.code == 200) {
+          //   console.log(res.code);
+        }
+      });
+    },
+    handleCheckAllChange(val) {
+      //   this.addTasksData.siteDeviceList = val ? cityOptions : [];
+      if ((this.addTasksData.siteDeviceList = val)) {
+        this.addTasksData.siteDeviceList = this.tabledatas.map(function (item) {
+          return item.PID;
+        });
+      } else {
+        this.addTasksData.siteDeviceList = [];
+      }
+      this.isIndeterminate = false;
+    },
+    handleCheckedCitiesChange(value) {
+      let checkedCount = value.length;
+      this.checkAll = checkedCount === this.tabledatas.length;
+      this.isIndeterminate =
+        checkedCount > 0 && checkedCount < this.tabledatas.length;
+    },
+    handleClick(text, obj) {
+      switch (text) {
+        case "updata": //上报故障
+          this.failureSiteDialog = true;
+          break;
+        case "see": //查看任务
+          //console.log("obj", obj.PID);
+          this.getTaskByPIDDialog = true;
+          this.getTaskByPIDData.PID = obj.PID;
+          this.GetTaskForSiteDevicePID();
+          break;
+      }
+    },
+    GetTaskForSiteDevicePID() {
+      let vm = this;
+      request({
+        url: "/Task/GetTaskForSiteDevicePID",
+        param: JSON.stringify(vm.getTaskByPIDData),
+        method: "post",
+        onError: function () {},
+        vm,
+      }).then((res) => {
+        if (res.code == 200) {
+          //   console.log(res.data);
+          vm.PIDTasks = res.data;
+        }
+      });
+    },
+  },
+};
+</script>
+<style lang="scss">
+.el-checkbox {
+  float: left;
+  margin-right: 25px;
+}
+.el-col {
+  .el-select {
+    width: 100%;
+  }
+  .el-date-editor {
+    width: 100%;
+  }
+}
+.pidSelectBox {
+  max-height: 200px;
+  overflow-y: auto;
+  //   border: 1px solid #ccc;
+  //   padding: 4px;
+  .el-checkbox {
+    width: 25%;
+    margin: 0;
+    text-align: left;
+  }
+}
+.pidSelectBox::-webkit-scrollbar {
+  /*滚动条整体样式*/
+  width: 10px; /*高宽分别对应横竖滚动条的尺寸*/
+  height: 1px;
+}
+.pidSelectBox::-webkit-scrollbar-thumb {
+  /*滚动条里面小方块*/
+  border-radius: 10px;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+  background: #ddd;
+}
+.pidSelectBox::-webkit-scrollbar-track {
+  /*滚动条里面小方块*/
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  background: #eee;
+}
+</style>

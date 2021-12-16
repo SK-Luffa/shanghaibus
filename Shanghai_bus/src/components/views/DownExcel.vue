@@ -1,0 +1,301 @@
+<template>
+  <div>
+    <div class="pageContent">
+      <div class="title-svg">
+        <img src="../../assets/images/downexcel.svg" alt />
+      </div>
+      <div class="sitesTop">
+        <div class="inputs">
+          <div v-if="user.isAdmin" style="width:400px">
+            <div class="equipSearch">
+              <el-select size="mini" v-model="search.userId" placeholder="导出表格人员">
+                <el-option
+                  v-for="item in allUser"
+                  :key="item.value"
+                  :label="item.Name+item.phone"
+                  :value="item.userId"
+                ></el-option>
+              </el-select>
+            </div>
+            <div class="equipSearchBtn">
+              <el-button
+                type="success"
+                size="mini"
+                class="leftBtn blueBtn"
+                @click="GetAllExcelPortInfoByUserId()"
+              >搜索</el-button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="equipSearchBtn" style="width:10px;height:10px"></div>
+          <div class="equipSearchBtn">
+            <el-date-picker
+              class="equipSearch"
+              size="mini"
+              v-model="maintenanceTime"
+              align="right"
+              type="date"
+              placeholder="选择日期"
+            ></el-date-picker>
+          </div>
+          <div class="equipSearchBtn">
+            <el-button
+              type="success"
+              size="mini"
+              class="leftBtn blueBtn"
+              @click="exportOperationMaintenanceData()"
+            >运维数据</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="table mainTable">
+        <el-table :data="brokenData" style="width: 100%">
+          <el-table-column prop="createCode" label="code码"></el-table-column>
+          <el-table-column prop="requestTime" label="导出时间"></el-table-column>
+          <el-table-column prop="remark" label="备注"></el-table-column>
+          <el-table-column prop="option" label="操作">
+            <template slot-scope="scope">
+              <el-button
+                @click="handleClick('download', scope.row)"
+                class="tableGreenBtn"
+                size="mini"
+                plain
+              >下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          :page-size="10"
+          :pager-count="11"
+          layout="prev, pager, next"
+          :current-page="currentPage"
+          :total="tableLen"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        ></el-pagination>
+      </div>
+    </div>
+  </div>
+</template>
+  
+<script>
+import request from "../../assets/js/axios";
+import config from "../../assets/js/config";
+import timer from "../../assets/js/time";
+export default {
+  data() {
+    return {
+      brokenData: [],
+      search: {
+        userId: ""
+      },
+      maintenanceTime: "",
+      allUser: [],
+      loading: false,
+      currentPage: 1,
+      tableLen: 0,
+      isAllExcel: true,
+      user: JSON.parse(localStorage.getItem("user"))
+    };
+  },
+  mounted() {
+    // const user = JSON.parse(localStorage.getItem("user"));
+    // console.log(user);
+    // if(){
+
+    // }
+    let vm = this;
+    if (this.user.isAdmin) {
+      this.GetAllExcelPortInfo(1); //http://127.0.0.1:999/ExcelExportInfo/GetAllExcelPortInfo
+
+      request({
+        url: "/User/GetAllUser",
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.allUser = res.data;
+          // console.log(vm.allUser);
+        }
+      });
+    } else {
+      vm.search.userId = vm.user.userId;
+      this.GetAllExcelPortInfoByUserId(1);
+    }
+  },
+  methods: {
+    exportOperationMaintenanceData() {
+      if (!this.maintenanceTime) {
+        this.$message({
+          message: "请选择时间！",
+          type: "warning"
+        });
+        return;
+      }
+      let time = timer.dateFormat("YYYY-mm-dd", this.maintenanceTime);
+      console.log("time", time);
+      let vm = this;
+      this.$prompt("请输入备注信息", "备注", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消"
+      })
+        .then(({ value }) => {
+          let data = {
+            time1: time + " 00:00:01",
+            time2: time + " 23:59:59",
+            remark: value
+          };
+          request({
+            url: "/ExcelExportInfo/ExportOperationMaintenanceData",
+            method: "post",
+            param: JSON.stringify(data),
+            onError() {},
+            vm
+          }).then(res => {
+            if (res.code === 200) {
+              vm.$message({
+                message: "文件生成中，请注意您的邮箱！",
+                type: "success"
+              });
+            }
+          });
+        })
+        .catch(() => {
+          vm.$message({
+            type: "info",
+            message: "取消输入"
+          });
+        });
+    },
+    handleClick(text, obj) {
+      let vm = this;
+      switch (text) {
+        case "download":
+          vm.GetExcelPortInfoByCreateCode(obj);
+          break;
+        case "delete":
+          vm.$confirm("谨慎删除, 是否继续?", "提示", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            type: "warning"
+          })
+            .then(() => {
+              vm.DelTaskStatusByCode(obj);
+            })
+            .catch(() => {
+              vm.$message({
+                type: "info",
+                message: "已取消删除"
+              });
+            });
+          break;
+      }
+    },
+
+    GetAllExcelPortInfo(page) {
+      //http://127.0.0.1:999/ExcelExportInfo/GetAllExcelPortInfo
+      let vm = this;
+      vm.isAllExcel = true;
+      let form = new FormData();
+      form.append("page", page);
+      form.append("index", 10);
+      request({
+        url: "/ExcelExportInfo/GetAllExcelPortInfo",
+        method: "post",
+        param: form,
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          console.log(res.data);
+          vm.brokenData = res.data;
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    GetAllExcelPortInfoByUserId(page) {
+      //http://127.0.0.1:999/ExcelExportInfo/GetAllExcelPortInfoByUserId
+      let vm = this;
+      vm.isAllExcel = false;
+      let form = new FormData();
+      console.log(page || vm.currentPage);
+      form.append("userId", vm.search.userId);
+      form.append("index", 10);
+      form.append("page", page || vm.currentPage);
+
+      request({
+        url: "/ExcelExportInfo/GetAllExcelPortInfoByUserId",
+        method: "post",
+        param: form,
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          console.log(res.data);
+          vm.brokenData = res.data;
+          vm.tableLen = res.recordsFiltered;
+        }
+      });
+    },
+    GetExcelPortInfoByCreateCode(obj) {
+      let vm = this;
+      let form = new FormData();
+      form.append("createCode", obj.createCode);
+      request({
+        url: "/ExcelExportInfo/GetExcelPortInfoByCreateCode", //http://127.0.0.1:999/ExcelExportInfo/GetExcelPortInfoByCreateCode
+        method: "post",
+        param: form,
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          window.open(config.product + res.data.fileUrl);
+          vm.$message({
+            type: "success",
+            message: "下载成功"
+          });
+        }
+      });
+    },
+
+    handleSizeChange(val) {
+      this.currentPage = 1;
+      this.pageSize = val;
+    },
+    handleCurrentChange(val) {
+      this.currentPage = val;
+      this.isAllExcel
+        ? this.GetAllExcelPortInfo(val)
+        : this.GetAllExcelPortInfoByUserId(val); //http://127.0.0.1:999/ExcelExportInfo/GetAllExcelPortInfo
+    }
+  }
+};
+</script>
+<style>
+.addLabel {
+  display: inline-block;
+  height: 28px;
+  line-height: 28px;
+}
+.taskTopSearch .el-date-editor .el-range-input {
+  color: #fff;
+}
+.taskTopSearch .el-input__inner,
+.taskTopSearch .el-range-input,
+.taskTopSearch .el-checkbox__inner {
+  background: rgba(0, 0, 0, 0);
+}
+.el-input__inner .el-date-editor {
+  color: #fff;
+}
+.equipSearchBtn .el-input__inner {
+  background: rgba(0, 0, 0, 0);
+}
+.el-message-box .el-input__inner {
+  height: 28px;
+  line-height: 28px;
+  color: #000;
+}
+</style>

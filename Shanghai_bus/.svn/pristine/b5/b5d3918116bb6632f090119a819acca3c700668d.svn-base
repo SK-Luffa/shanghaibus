@@ -1,0 +1,459 @@
+<template>
+  <div :style="{ height: statusBarHeight }">
+    <div style="background: linear-gradient(230deg, #051841 0%, #16053d 100%);height:100%">
+      <!--导航-->
+      <div style="height: calc(100% - 60px)">
+        <el-header>
+          <div class="program-title-box">
+            <div class="program-name">
+              <span class="program-name-icon"></span>
+              <div class="title-animation" :style="{ width: titleWith }">
+                <span class="program-name-sub">公交运维</span>
+              </div>
+              <span class="program-name-line"></span>
+              <span class="program-name-tri">后台管理系统</span>
+            </div>
+
+            <div class="notice">
+              <div class="voice">
+                <div class="voiceBox">
+                  <span class="text">温馨提示：您有新的任务待处理</span>
+                  <div class="icon">
+                    <img src="../assets/img/icon/voice.png" alt />
+                  </div>
+                </div>
+              </div>
+              <div class="help">
+                <span class="text">帮助</span>
+
+                <div class="icon">
+                  <img src="../assets/img/icon/help.png" alt />
+                </div>
+              </div>
+              <div class="ring">
+                <div class="icon">
+                  <img src="../assets/img/icon/ring.png" alt />
+                </div>
+              </div>
+            </div>
+            <div class="loginmes1">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <span>{{ name }}</span>&nbsp;&nbsp;
+              <span @click="exit()">退出</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            </div>
+            <div class="clearfix"></div>
+          </div>
+        </el-header>
+        <el-container style="height:100%;">
+          <el-aside :style="{ width: navwidth }" style="height:100%;">
+            <div class="system-name">
+              <i class="el-icon-s-fold" @click="navstyle()"></i>
+            </div>
+            <el-menu
+              @open="handleOpen"
+              @close="handleClose"
+              :collapse="isCollapse"
+              :default-active="default_active_menu"
+              router
+            >
+              <el-submenu v-for="item in menulist" :key="item.title" :index="item.title">
+                <template slot="title">
+                  <i :class="item.icon" style="color: #fff"></i>
+                  <span>{{ item.title }}</span>
+                </template>
+                <el-menu-item
+                  v-for="subitem in item.subnav"
+                  :key="subitem.title"
+                  :index="subitem.index"
+                >{{ subitem.item }}</el-menu-item>
+              </el-submenu>
+            </el-menu>
+          </el-aside>
+          <el-container style="overflow:auto">
+            <div class="header"></div>
+            <div style="width:100%;">
+              <div style="padding: 10px 20px; margin-top: 4px">
+                <router-view></router-view>
+              </div>
+            </div>
+          </el-container>
+        </el-container>
+      </div>
+      <!-- <div><el-select v-model="value" placeholder="请选择">
+    <el-option
+      v-for="item in options"
+      :key="item.value"
+      :label="item.label"
+      :value="item.value">
+    </el-option>
+      </el-select></div>-->
+    </div>
+    <div class="bottom-nex"></div>
+  </div>
+</template>
+<script>
+import menu from "../assets/js/nav";
+// import { mapActions } from "vuex";
+import request from "../assets/js/axios";
+export default {
+  data() {
+    return {
+      statusBarHeight: `${document.documentElement.scrollHeight}` + "px",
+      //pageMark: "1-1",
+      name: "",
+      titleWith: "116px",
+      isCollapse: false,
+      navwidth: "200px",
+      loading: false,
+      isClick: false,
+      default_active_menu: "/",
+      lncolor: "",
+      menulist: []
+    };
+  },
+  created() {
+    let usermes = JSON.parse(localStorage.getItem("user"));
+    //console.log("sss",usermes)
+    if (!usermes) {
+      this.exit();
+      return;
+    }
+    this.menulist = menu;
+    this.default_active_menu = this.$route.name;
+    this.name = usermes.userName;
+    // this.getTable();
+  },
+  components: {},
+  methods: {
+    getTable() {
+      let params = new FormData();
+      params.append("index", 10000);
+      params.append("page", 1);
+      let _this = this;
+      this.tableLoading = true;
+      // console.log("request",request)
+      request({
+        //确定添加基站 todo
+        url: "", //http://127.0.0.1:737/api/qatar/create
+        param: params,
+        method: "post",
+        onError: () => {
+          console.log("false");
+        },
+        vm: _this
+      }).then(res => {
+        if (res.code == 200) {
+          console.log("datalist", res);
+          _this.$store.commit("getList", res.data);
+        }
+      });
+    },
+    handleOpen(key, keyPath) {
+      console.log(key, keyPath);
+    },
+    handleClose(key, keyPath) {
+      console.log(key, keyPath);
+    },
+    navstyle: function() {
+      if (this.isCollapse) {
+        this.isCollapse = false;
+        this.navwidth = "200px";
+        this.titleWith = "116px";
+      } else {
+        this.isCollapse = true;
+        this.navwidth = "64px";
+        this.titleWith = "0px";
+      }
+    },
+    exit: function() {
+      this.$router.push("/");
+    }
+  },
+  mounted() {}
+};
+</script>
+
+<style lang="scss">
+.el-container {
+  height: 100%;
+}
+
+.el-container::-webkit-scrollbar {
+  display: none;
+}
+
+.el-menu-vertical-demo:not(.el-menu--collapse) {
+  width: 200px;
+  min-height: 400px;
+}
+
+.el-menu {
+  list-style: none;
+  position: relative;
+  margin: 0;
+  padding-left: 0;
+  background: none !important;
+  border: none !important;
+  .is-active {
+    background: linear-gradient(230deg, rgb(5, 24, 65) 0%, rgb(22, 5, 61) 100%);
+    .el-submenu__title > span {
+      color: rgba(16, 142, 233, 1);
+    }
+    .el-menu .is-active {
+      color: rgba(16, 142, 233, 1);
+    }
+  }
+}
+
+.el-menu .el-submenu__title,
+.el-menu .el-menu-item {
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+.system-name {
+  //   .el-icon-s-fold {
+  //   }
+  height: 34px;
+  line-height: 34px;
+  font-size: 22px;
+  color: #fff;
+  //   margin-top: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.el-main {
+  padding: 0;
+}
+
+/* .el-row--flex {
+  background: #f7f7f7;
+} */
+.mes-box {
+  width: 480px;
+  height: 300px;
+  background: #fff;
+  margin-top: 10px;
+}
+
+.el-menu-item,
+.el-submenu__title {
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
+.mes-title {
+  width: 80%;
+  margin: 0 auto;
+  padding: 10px 0 0px;
+  border-bottom: 1px solid #ededed;
+  height: 40px;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 40px;
+  color: #001529;
+  text-align: left;
+}
+
+.mes-box-item {
+  width: 64%;
+  margin: 0 auto;
+  height: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.el-submenu__title:hover {
+  background: linear-gradient(
+    230deg,
+    rgb(5, 24, 65) 0%,
+    rgb(22, 5, 61) 100%
+  ) !important;
+}
+
+.el-menu-item:focus,
+.el-menu-item:hover {
+  outline: 0;
+  background: linear-gradient(
+    230deg,
+    rgb(5, 24, 65) 0%,
+    rgb(22, 5, 61) 100%
+  ) !important;
+}
+
+.loginmes1 {
+  font-size: 12px;
+  color: #fff;
+  position: fixed;
+  right: 0;
+  height: 36px;
+  line-height: 36px;
+  z-index: 100;
+}
+
+.loginmes1 > span {
+  cursor: pointer;
+}
+
+.loginmes2 {
+  font-size: 12px;
+  color: #000;
+  position: relative;
+  right: 0;
+  height: 36px;
+  line-height: 36px;
+  text-align: right;
+  z-index: 100;
+  background: #fff;
+}
+
+.loginmes2 > span {
+  cursor: pointer;
+  color: #000;
+}
+
+.el-aside {
+  transition: width 1s;
+
+  background: rgba(238, 238, 238, 0.06);
+  //   background: url("~@/assets/img/left-bg-1.png") center center no-repeat;
+}
+
+.el-submenu__title {
+  font-size: 16px !important;
+  color: #303133;
+  padding: 0 20px;
+  cursor: pointer;
+  -webkit-transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+  transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.el-menu > .el-menu-item {
+  font-size: 14px;
+}
+
+.el-header {
+  //   width: 100%;
+  background: rgba(238, 238, 238, 0.06);
+  overflow: hidden;
+  color: #fff;
+  //   background: linear-gradient(230deg, #051841 0%, #16053d 100%);
+  opacity: 1;
+  position: relative;
+  .notice {
+    position: absolute;
+    right: 200px;
+    top: 16px;
+    display: flex;
+    flex-wrap: nowrap;
+    width: 500px;
+    .voice {
+      width: 275px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 32px;
+      position: relative;
+      .text {
+        margin-left: 5px;
+      }
+    }
+  }
+  .icon {
+    position: absolute;
+    left: 20px;
+    top: 8px;
+    width: 16px;
+    height: 16px;
+    img {
+      display: block;
+      width: 100%;
+    }
+  }
+  .help,
+  .ring {
+    position: relative;
+    width: 72px;
+    height: 32px;
+    font-size: 14px;
+    line-height: 32px;
+    .text {
+      margin-left: 38px;
+    }
+  }
+  .program-title-box {
+    padding-top: 14px;
+  }
+  .program-name {
+    float: left;
+    // border:;
+    .title-animation {
+      transition: width 1s;
+      //   display: inline-block;
+      overflow: hidden;
+      float: left;
+    }
+    .program-name-icon {
+      width: 28px;
+      height: 28px;
+      background: radial-gradient(circle, #58d8f8 0%, #2c7dff 100%);
+      box-shadow: 0px 3px 12px #108ee9;
+      border-radius: 50%;
+      //   display: inline-block;
+      opacity: 1;
+      margin-top: 3px;
+      margin-right: 10px;
+      float: left;
+    }
+    .program-name-sub {
+      //   width: 108px;
+      height: 36px;
+      font-size: 22px;
+      font-weight: 400;
+      line-height: 36px;
+      letter-spacing: 2px;
+      color: #108ee9;
+      margin-right: 20px;
+      opacity: 1;
+      float: left;
+      white-space: nowrap;
+    }
+    .program-name-line {
+      width: 1px;
+      height: 18px;
+
+      background: linear-gradient(
+        180deg,
+        #1b214c 0%,
+        #ffffff 48%,
+        #1b214c 100%
+      );
+      opacity: 1;
+      float: left;
+      margin-top: 8px;
+      margin-right: 20px;
+    }
+    .program-name-tri {
+      //   width: 176px;
+      height: 36px;
+      font-size: 22px;
+      line-height: 36px;
+      color: #f3f3f3;
+      letter-spacing: 4px;
+      opacity: 1;
+    }
+  }
+}
+.bottom-nex {
+  position: fixed;
+  bottom: 0;
+}
+</style>

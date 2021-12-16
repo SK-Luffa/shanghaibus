@@ -1,0 +1,618 @@
+<template>
+  <div style="position: relative;">
+    <el-dialog
+      title="新增权限组"
+      :visible.sync="rightGrounpAddDialog"
+      width="800px"
+      :before-close="handleClose"
+    >
+      <div style="width:60%;margin:0 auto">
+        <el-form label-width="120px" :model="addrightGrounpData" size="mini">
+          <el-form-item label="权限组名称:">
+            <el-input v-model="addrightGrounpData.groupName"></el-input>
+          </el-form-item>
+          <el-form-item label="备注:">
+            <el-input v-model="addrightGrounpData.remark"></el-input>
+          </el-form-item>
+        </el-form>
+      </div>
+      <div>
+        <el-button type="success" class="blueBtn" size="mini" @click="AddPermissionGroup">确定</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      :title="addDialogTitile"
+      :visible.sync="rightAddDialog"
+      width="800px"
+      :before-close="handleClose"
+    >
+      <!-- appName: "UserControllers",
+        appMethod: "SendVerifyCode",
+      appRemark: "用户登录"-->
+      <div style="width:60%;margin:0 auto">
+        <el-form label-width="120px" :model="addrightData" size="mini">
+          <el-form-item label="权限模块名称:">
+            <el-input v-model="addrightData.appName"></el-input>
+          </el-form-item>
+          <el-form-item label="权限模块方法:">
+            <el-input v-model="addrightData.appMethod"></el-input>
+          </el-form-item>
+          <el-form-item label="权限名称:">
+            <el-input v-model="addrightData.appRemark"></el-input>
+          </el-form-item>
+        </el-form>
+      </div>
+      <div>
+        <el-button type="success" class="blueBtn" size="mini" @click="AddUserModule">确定</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      title="权限绑定"
+      :visible.sync="rightBlindDialog"
+      width="1200px"
+      :before-close="handleClose"
+    >
+      <div>
+        <el-form label-width="80px" :model="addrightGrounpData" size="mini">
+          <el-form-item label="权限:">
+            <el-checkbox-group v-model="userModuleId" class="allRights">
+              <div
+                class="checkbox userRight"
+                v-for="(item, index) in userRightList"
+                :key="'item.appRemark' + index"
+              >
+                <el-checkbox :label="item.appRemark"></el-checkbox>
+              </div>
+              <div class="clearfix"></div>
+            </el-checkbox-group>
+          </el-form-item>
+          <div>
+            <el-button
+              type="success"
+              size="mini"
+              class="blueBtn"
+              @click="ClearUserModuleToPermissionGroup('bind')"
+            >添加所选权限</el-button>
+            <!-- <el-button
+              type="success"
+              size="mini"
+              @click="BindUserModuleToPermissionGroup('unbind')"
+              >移除所选权限
+            </el-button>-->
+            <el-button
+              type="success"
+              class="blueBtn"
+              size="mini"
+              @click="ClearUserModuleToPermissionGroup()"
+            >清空权限组中权限</el-button>
+          </div>
+        </el-form>
+      </div>
+      <!-- <div>
+                <el-button type="success" size='mini' @click="AddPermissionGroup">确定</el-button>
+      </div>-->
+    </el-dialog>
+    <div class="pageContent">
+      <div class="title-svg">
+        <img src="../../assets/images/right.svg" alt />
+      </div>
+
+      <!-- <div class="sitesTop taskByid">
+        <div class="inputs"></div>
+        <div class="btns">
+          <div>
+            <el-button
+              type="success "
+              size="mini"
+              class="blueBtn"
+              @click="AddRightView(activeName)"
+            >新增{{ activeName }}</el-button>
+          </div>
+        </div>
+      </div>-->
+
+      <div class="table mainTable rightTab">
+        <div class="addBtn">
+          <el-button
+            type="success "
+            size="mini"
+            class="blueBtn"
+            @click="AddRightView(activeName)"
+          >新增{{ activeName }}</el-button>
+        </div>
+        <el-tabs v-model="activeName" @tab-click="tabClick" class="rightTab">
+          <el-tab-pane label="权限管理" name="权限">
+            <el-table
+              class="scrollTable"
+              v-loading="loading"
+              element-loading-spinner="el-icon-loading"
+              element-loading-background="rgba(256, 256, 256, 0.2)"
+              style="width: 100%;margin-top:10px;"
+              :data="rightData"
+            >
+            <!--  从v  -->
+              <!-- <el-table-column prop="index" label="序列"></el-table-column> -->
+              <el-table-column prop="appName" label="模块名称"></el-table-column>
+              <el-table-column prop="appMethod" label="模块方法"></el-table-column>
+              <el-table-column prop="appRemark" label="备注"></el-table-column>
+              <el-table-column prop="createTime" label="创建时间"></el-table-column>
+              <el-table-column prop="reWriteTime" label="修改时间"></el-table-column>
+              <el-table-column prop="option" label="操作">
+                <template slot-scope="scope">
+                  <el-button
+                    @click="handleClick('changeRight', scope.row)"
+                    class="tableBlueBtn"
+                    size="mini"
+                  >修改</el-button>
+                  <!-- <el-button
+                  @click="handleClick('deleteRight', scope.row)"
+                  class="option-btn-oprate"
+                  size="mini"
+                  plain
+                >
+                  删除
+                  </el-button>-->
+                </template>
+              </el-table-column>
+            </el-table>
+            <!-- <el-table-column prop="index" label="序列"></el-table-column> -->
+          </el-tab-pane>
+          <el-tab-pane label="权限组" name="权限组">
+            <el-table
+              v-loading="loading"
+              element-loading-spinner="el-icon-loading"
+              element-loading-background="rgba(256, 256, 256, 0.2)"
+              style="width: 100%;margin-top:10px;"
+              :data="rightGrounpData"
+            >
+              <!-- <el-table-column prop="index" label="序列"></el-table-column> -->
+              <el-table-column prop="id" label="id"></el-table-column>
+              <el-table-column prop="groupName" label="权限组名"></el-table-column>
+              <el-table-column prop="remark" label="备注"></el-table-column>
+              <el-table-column prop="option" label="操作">
+                <template slot-scope="scope">
+                  <el-button
+                    @click="handleClick('see', scope.row)"
+                    class="tableGreenBtn"
+                    size="mini"
+                  >权限</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-pagination
+              :page-size="10"
+              :pager-count="11"
+              layout="prev, pager, next"
+              :current-page="currentPage"
+              :total="tableLen"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+            ></el-pagination>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import request from "../../assets/js/axios.js";
+export default {
+  data() {
+    return {
+      handleClickObj: {}, //此为表格内部操作的obj
+      rightGrounpData: [], //权限组表格
+      tableLen: 0,
+      currentPage: 1,
+      loading: false,
+      rightGrounpAddDialog: false,
+      rightAddDialog: false,
+      addrightGrounpData: {
+        //添加权限组数据格式
+        groupName: "",
+        remark: ""
+      },
+      addDialogTitile: "新增权限",
+      addrightData: {
+        //添加权限数据格式
+        appName: "",
+        appMethod: "",
+        appRemark: ""
+      },
+      userModuleId: [],
+      rightBlindDialog: false,
+      userRightList: [],
+      activeName: "权限",
+      rightData: [] //权限表格
+    };
+  },
+  mounted() {
+    this.GetAllPermissionGroup();
+    this.GetAllUser();
+    this.GetAllUserModule();
+  },
+  methods: {
+    tabClick(tab, event) {
+      //   console.log(tab, event);
+    },
+    BindUserModuleToPermissionGroup(text) {
+      // console.log("userModuleId", this.userModuleId);
+      let vm = this;
+      let arr = vm.getIdArr();
+      let data = {
+        permissionGroupId: vm.handleClickObj.id,
+        userModuleId: arr
+      };
+      //http://127.0.0.1:999/PermissionGroup/RemoveUserModuleToPermissionGroup
+      let url =
+        text == "bind"
+          ? "/PermissionGroup/BindUserModuleToPermissionGroup"
+          : "/PermissionGroup/RemoveUserModuleToPermissionGroup";
+      //   console.log("data", data, url);
+      request({
+        url: url, //http://127.0.0.1:999/PermissionGroup/BindUserModuleToPermissionGroup
+        param: JSON.stringify(data),
+        method: "post",
+        onError: function() {
+          // console
+        },
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.rightBlindDialog = false;
+          vm.GetAllPermissionGroup();
+          this.$message({
+            type: "success",
+            message: "已绑定"
+          });
+        }
+      });
+    },
+    ClearUserModuleToPermissionGroup(text) {
+      let vm = this;
+      let form = new FormData();
+      form.append("permissionGroupId", vm.handleClickObj.id);
+      request({
+        url: "/PermissionGroup/ClearUserModuleToPermissionGroup", //http://127.0.0.1:999/PermissionGroup/ClearUserModuleToPermissionGroup
+        param: form,
+        method: "post",
+        onError: function() {
+          // console
+        },
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          if (!text) {
+            vm.rightBlindDialog = false;
+            vm.GetAllPermissionGroup();
+            vm.$message({
+              type: "success",
+              message: "已清空"
+            });
+          } else {
+            vm.BindUserModuleToPermissionGroup("bind");
+          }
+        }
+      });
+    },
+    getIdArr() {
+      let arr = [];
+      for (let i = 0; i < this.userModuleId.length; i++) {
+        inner: for (let j = 0; j < this.userRightList.length; j++) {
+          if (this.userModuleId[i] == this.userRightList[j].appRemark) {
+            arr.push(this.userRightList[j].id);
+            break inner;
+          }
+        }
+      }
+      return arr;
+    },
+    handleClose() {
+      this.rightGrounpAddDialog = false;
+      this.rightBlindDialog = false;
+      this.rightAddDialog = false;
+      this.userModuleId = []; //初始化选择权限选择
+    },
+    AddRightView(text) {
+      if (text == "权限") {
+        this.addDialogTitile = "新增权限";
+        this.rightAddDialog = true;
+      } else {
+        this.rightGrounpAddDialog = true;
+      }
+    },
+    GetAllUser() {
+      let vm = this;
+      request({
+        url: "/User/GetAllUser",
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          console.log(res.data);
+          vm.GetAllUserData = res.data;
+        }
+      });
+    },
+    //http://127.0.0.1:999/PermissionGroup/GetAllPermissionGroup
+    GetAllPermissionGroup() {
+      let vm = this;
+      let data = new FormData();
+      data.append("index", 10);
+      data.append("page", 1);
+      request({
+        url: "/PermissionGroup/GetAllPermissionGroup",
+        param: data,
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.rightGrounpData = res.data;
+          vm.tableLen = res.data.length;
+        }
+      });
+    },
+    //http://127.0.0.1:999/UserModule/AddUserModule
+    AddUserModule() {
+      let vm = this;
+      let data = vm.addrightData;
+      let url = "/UserModule/AddUserModule";
+      let text = "权限新增成功";
+      if (data.id) {
+        url = "/UserModule/UpdateUserModule";
+        text = "权限修改成功";
+      }
+      request({
+        url: url,
+        param: JSON.stringify(data),
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.rightAddDialog = false;
+
+          vm.addrightData = {
+            //添加权限数据格式
+            appName: "",
+            appMethod: "",
+            appRemark: ""
+          };
+          vm.$message({
+            message: text,
+            type: "success",
+            duration: 1000
+          });
+        }
+      });
+    },
+
+    // http://127.0.0.1:999/PermissionGroup/AddPermissionGroup
+    AddPermissionGroup() {
+      let vm = this;
+      let data = vm.addrightGrounpData;
+      var reg = new RegExp("^[a-z|0-9]{1,}$", "");
+      console.log(data.groupName, reg.test(data.groupName));
+      if (!reg.test(data.groupName)) {
+        vm.$message({
+          type: "warning",
+          message: "权限组为字母或数字！",
+          duration: 1000
+        });
+        return;
+      }
+      request({
+        url: "/PermissionGroup/AddPermissionGroup",
+        param: JSON.stringify(data),
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          // vm.PermissionGroupData = res.data;
+          vm.rightGrounpAddDialog = false;
+          vm.$message({
+            message: "添加成功",
+            type: "success",
+            duration: 1000
+          });
+        }
+      });
+    },
+    //http://127.0.0.1:999/User/BindUserToPermissionGroup
+    BindUserToPermissionGroup() {
+      let vm = this;
+      let data = {
+        queryUserId: vm.GetAllUserData[2].userId,
+        permissionGroupId: vm.PermissionGroupData[1].id
+      };
+      request({
+        url: "/User/BindUserToPermissionGroup",
+        param: JSON.stringify(data),
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          // vm.PermissionGroupData = res.data;
+          vm.$message({
+            message: "绑定成功",
+            type: "success",
+            duration: 1000
+          });
+        }
+      });
+    },
+    RemoveUserPermissionGroup() {
+      //http://127.0.0.1:999/User/RemoveUserPermissionGroup
+      let vm = this;
+      let data = {
+        queryUserId: vm.GetAllUserData[2].userId
+      };
+      request({
+        url: "/User/RemoveUserPermissionGroup",
+        param: JSON.stringify(data),
+        method: "post",
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          // vm.PermissionGroupData = res.data;
+          vm.$message({
+            message: "移除权限成功",
+            type: "success",
+            duration: 1000
+          });
+        }
+      });
+    },
+    GetAllUserModule() {
+      let vm = this; //http://127.0.0.1:999/UserModule/GetAllUserModule
+      let form = new FormData();
+      form.append("index", 1000);
+      form.append("page", 1);
+      request({
+        url: `/UserModule/GetAllUserModule`,
+        method: "post",
+        param: form,
+        onError: function() {},
+        vm
+      }).then(res => {
+        if (res.code == 200) {
+          vm.rightData = res.data;
+          vm.userRightList = res.data;
+        }
+      });
+    },
+    handleClick(text, obj) {
+      let vm = this;
+      switch (text) {
+        case "see":
+          console.log("see", obj.userModuleList);
+
+          vm.handleClickObj = obj;
+          //   console.log("rightGrounpAddDialog", vm.handleClickObj);
+          vm.userModuleId = [];
+          if (obj.userModuleList && obj.userModuleList.length) {
+            for (let i in obj.userModuleList) {
+              vm.userModuleId.push(obj.userModuleList[i].appRemark);
+            }
+          }
+          vm.rightBlindDialog = true;
+          break;
+        case "delete":
+          vm.$confirm("谨慎删除, 是否继续?", "提示", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            type: "warning"
+          })
+            .then(() => {
+              console.log("删除");
+              vm.DeleteUser(obj);
+            })
+            .catch(() => {
+              console.log("已取消删除");
+              vm.$message({
+                type: "info",
+                message: "已取消删除"
+              });
+            });
+
+          break;
+        case "edit":
+          vm.addrightGrounpData = obj;
+          //   vm.AddUserView();
+          vm.addrightGrounpData.name = obj.name || obj.Name;
+          vm.addDialogTitile = "修改权限组";
+          vm.rightGrounpAddDialog = true;
+          break;
+        case "changeRight":
+          //   console.log(obj);
+          vm.addrightData = obj;
+          vm.addDialogTitile = "修改权限";
+          vm.rightAddDialog = true;
+          break;
+      }
+    },
+    DeleteUser(obj) {},
+    handleSizeChange(val) {
+      this.currentPage = 1;
+      this.pageSize = val;
+    },
+    handleCurrentChange(val) {
+      // switch (this.lastOperate) {
+      //     case "all":
+      //         this.GetAllSiteDevice(val);
+      //         break;
+      //     case "isOnline": ////isOnline  byId  info
+      //         this.GetSiteDeviceForIsOnline(val);
+      //         break;
+      //     default:
+      //         ////isOnline  byId  info
+      //         //   this.GetSiteDeviceForIsOnline(val);
+      //         break;
+      // }
+
+      this.currentPage = val;
+    }
+  }
+};
+</script>
+<style lang="scss">
+/* div {
+        color: #fff;
+    } */
+.checkbox {
+  float: left;
+  width: 25%;
+  text-align: left;
+}
+
+.sitesTop-userRight {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  right: 0;
+}
+
+.table {
+  .el-tabs {
+    .el-tabs__item {
+      color: #fff;
+    }
+    .el-tabs__nav {
+      .is-active {
+        color: #409eff;
+      }
+    }
+  }
+}
+.rightTab {
+  position: relative;
+  .addBtn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 10;
+  }
+}
+.userRight {
+  .el-checkbox {
+    width: 100%;
+    word-break: normal;
+    display: inline-block;
+    .el-checkbox__label {
+      width: 230px;
+      display: inline-block;
+      white-space: pre-wrap;
+    }
+  }
+}
+.allRights {
+  max-height: 400px;
+  overflow-y: auto;
+}
+</style>
